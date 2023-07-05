@@ -1,4 +1,9 @@
-from .src.tdef import func1 as f
+from .src.utilities import LoggingSetup
+from .src.tdef import TDEF
 
-print("hello!")
-print(f(10))
+# There is an issue at the moment where importing TVM and torch causes a free pointer
+# error as they both have overlapping symbols, didn't know it was possible.
+# from .src.dump_model import getPyTorchModels
+# getPyTorchModels()
+
+TDEF()
