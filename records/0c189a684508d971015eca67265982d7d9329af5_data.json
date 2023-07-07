@@ -1,0 +1,20 @@
+{
+    "trials": 50,
+    "gpus": [
+        0
+    ],
+    "parallel": 4,
+    "number": 3,
+    "timeout": 10,
+    "path": "/home/s/cupti/learning/tuning_as_a_defence/tvm/scripts/dumps/onnx/vision/classification/resnet/model/4e8f8653e7a2222b3904cc3fe8e304cd8b339ce1d05fd24688162f86fb6df52c_resnet18-v1-7.onnx",
+    "enable_autoscheduler": false,
+    "repeat": 1,
+    "mixed_precision": false,
+    "opt_level": 3,
+    "target": "cuda",
+    "min_repeat_ms": 1000,
+    "tuner": "xgb",
+    "early_stopping": 1000,
+    "hash": "0c189a684508d971015eca67265982d7d9329af5",
+    "records": "records/0c189a684508d971015eca67265982d7d9329af5_records.json"
+}

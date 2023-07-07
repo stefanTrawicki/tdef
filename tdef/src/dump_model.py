@@ -1,8 +1,8 @@
 import os
-import logging
 import json
 import torch
-# from onnx import hub
+import onnx
+from onnx import hub
 # from enum import Enum
 
 # class Frameworks(Enum):
@@ -22,9 +22,15 @@ import torch
 #     return {}
 
 
-# def dumpONNX(file_path: str, model: str, input_shape: list = None):
-#     hub.set_dir("dumps")
-#     model = hub.load(model)
+def dumpONNX(model: str):
+    # hub.set_dir("dumps/onnx")
+    # model = hub.load(model)
+    onnx_model = onnx.load_model("/home/s/cupti/learning/tuning_as_a_defence/tvm/scripts/dumps/onnx/vision/classification/resnet/model/4e8f8653e7a2222b3904cc3fe8e304cd8b339ce1d05fd24688162f86fb6df52c_resnet18-v1-7.onnx")
+    onnx_model.graph.input[0].type.tensor_type.shape.dim[0].dim_value = 1
+    onnx_model.graph.output[0].type.tensor_type.shape.dim[0].dim_value = 1
+    onnx.checker.check_model(onnx_model)
+    onnx.save(onnx_model, "/home/s/cupti/learning/tuning_as_a_defence/tvm/scripts/dumps/onnx/vision/classification/resnet/model/4e8f8653e7a2222b3904cc3fe8e304cd8b339ce1d05fd24688162f86fb6df52c_resnet18-v1-7.onnx")
+    print("frozen model saved")
 
 
 # handlers = {
@@ -40,10 +46,9 @@ import torch
 #         f(file_path=file_path, model=model, input_shape=None)
 #     return file_path
 
-
 def getPyTorchModels():
-    logging.warning(
-        "Fetching PyTorch models from TorchHub. Importing TVM & PyTorch WILL cause a segfault, be aware.")
+    print("Fetching PyTorch models from TorchHub. Importing TVM & PyTorch WILL cause a segfault, be aware.")
+
     models = [
         "resnet18",
         "resnet34",
@@ -60,7 +65,7 @@ def getPyTorchModels():
         file_name = "dumps/pytorch/" + m + ".pth.zip"
         if not os.path.exists(file_name):
             dumpPyTorch(file_name, m)
-            logging.info(f"Downloaded {m} to disk")
+            print(f"Downloaded {m} to disk")
 
 
 def dumpPyTorch(file_path: str, model: str):
