@@ -20,6 +20,8 @@ nvidia-cusolver-cu11==11.4.0.1
 nvidia-cusparse-cu11==11.7.4.91
 nvidia-nccl-cu11==2.14.3
 nvidia-nvtx-cu11==11.7.91
+onnx==1.14.0
+protobuf==4.23.3
 psutil==5.9.5
 scipy==1.10.1
 sympy==1.12
@@ -27,4 +29,4 @@ torch==2.0.1
 tornado==6.3.2
 triton==2.0.0
 typing-extensions==4.7.1
-xgboost==1.7.6
+xgboost==1.5.2

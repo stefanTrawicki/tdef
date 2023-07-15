@@ -1,14 +1,12 @@
 import os
 import json
-import ast
-import time
-import ctypes
 import numpy as np
-
 import hashlib
 
 # ============== TDEF imports ==============
 from .tvm_model import Model
+
+from .utilities import DefaultLog, ConfigureLog
 
 def get_hash(data:dict) -> str:
     s = []
@@ -32,46 +30,65 @@ class TDEF():
                 f.write(json.dumps(job, indent=4))
         return records_exist, records
 
-    def __init__(self, job:dict = {}, model_path="/home/s/cupti/learning/tuning_as_a_defence/tvm/scripts/dumps/pytorch/resnet18.pth.zip"):
+    def __init__(self, job:dict = {}, model_path="/home/s/cupti/learning/tuning_as_a_defence/tvm/scripts/dumps/pytorch/resnet18.pth.zip", dry_run=False):
         file_name = model_path
         # shape_dict = None
         # with open(file_name + ".json") as f:
         #     shape_dict = json.load(f)
-        
-        dry_run = False
 
         job["path"] = file_name
         # job["shape_dict"] = shape_dict
-        job["enable_autoscheduler"] = job["enable_autoscheduler"] if "enable_autoscheduler" in job else False
-        job["parallel"] = job["parallel"] if "parallel" in job else 4
-        job["trials"] = job["trials"] if "trials" in job else 10000
-        job["timeout"] = job["timeout"] if "timeout" in job else 100
-        job["repeat"] = job["repeat"] if "repeat" in job else 1
-        job["number"] = job["number"] if "number" in job else 10
-        job["mixed_precision"] = job["mixed_precision"] if "mixed_precision" in job else False
-        job["opt_level"] = job["opt_level"] if "opt_level" in job else 3
-        job["gpus"] = job["gpus"] if "gpus" in job else [0]
-        # job["target"] = job["target"] if "target" in job else "cuda -arch=sm_80"
-        job["target"] = job["target"] if "target" in job else "cuda"
-        job["min_repeat_ms"] = job["min_repeat_ms"] if "min_repeat_ms" in job else 1000
-        job["tuner"] = job["tuner"] if "tuner" in job else "xgb"
-        job["early_stopping"] = job["early_stopping"] if "early_stopping" in job else 1000
+        job["enable_autoscheduler"] = job.get("enable_autoscheduler", False)
+        job["parallel"] = job.get("parallel", 4)
+        job["trials"] = job.get("trials", 10000)
+        job["timeout"] = job.get("timeout", 100)
+        job["repeat"] = job.get("repeat", 1)
+        job["number"] = job.get("number", 10)
+        job["mixed_precision"] = job.get("mixed_precision", False)
+        job["opt_level"] = job.get("opt_level", 3) 
+        job["gpus"] = job.get("gpus", [0])
+        job["target"] = job.get("target", "cuda -arch=sm_80")
+        job["min_repeat_ms"] = job.get("min_repeat_ms", 1000)
+        job["tuner"] = job.get("tuner", "xgb")
+        job["early_stopping"] = job.get("early_stopping", 1000)
+        job["include_simple_tasks"] = job.get("include_simple_tasks", False)
+
+        job["hardware_params_num_cores"] = job.get("hardware_params_num_cores", None)
+        job["hardware_params_vector_unit_bytes"] = job.get("hardware_params_vector_unit_bytes", None)
+        job["hardware_params_cache_line_bytes"] = job.get("hardware_params_cache_line_bytes", None)
+        job["hardware_params_max_shared_memory_per_block"] = job.get("hardware_params_max_shared_memory_per_block", None)
+        job["hardware_params_max_local_memory_per_block"] = job.get("hardware_params_max_local_memory_per_block", None)
+        job["hardware_params_max_threads_per_block"] = job.get("hardware_params_max_threads_per_block", None)
+        job["hardware_params_max_vthread_extent"] = job.get("hardware_params_max_vthread_extent", None)
+        job["hardware_params_warp_size"] = job.get("hardware_params_warp_size", None)
+        job["hardware_params_target"] = job.get("hardware_params_target", job["target"])
+        job["hardware_params_target_host"] = job.get("hardware_params_target_host", None)
 
         records_exist, records_path = self.records_and_data(job)
         job["records"] = records_path
 
         print(json.dumps(job, indent=4))
 
-
-        # job["records"] = "/home/s/cupti/learning/tuning_as_a_defence/tvm/scripts/dumps/onnx/vision/classification/resnet/model/test_records.json"
         model = Model(job)
         if not records_exist:
             print(f"Records {records_path!a} not found, will tune")
-            if not dry_run:
-                model.tune(job)
+            model.tune(job, dry_run=dry_run)
         else:
             print(f"Existing records {records_path!a} found, tuning not required")
 
         if not dry_run:
             model.compile(job)
-            model.inferRandom(profile=True)
+            times = []
+            for i in range(0, 10000):
+                times.append(model.inferRandom(profile=True))
+            avg = sum(times) / len(times)
+            times.sort()
+            min_t = times[0]
+            max_t = times[-1]
+            med_t = times[int(len(times)/2)]
+            var = np.var(times)
+            print(f"avg {avg} ms \n" +
+                  f"min {min_t} ms \n" +
+                  f"med {med_t} ms \n" +
+                  f"max {max_t} ms \n" +
+                  f"variance {var}")
