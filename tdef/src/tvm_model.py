@@ -71,8 +71,8 @@ class Model():
     def __init__(self, job: dict):
         # self.shape = job["shape_dict"]
         frontend = tvmc.frontends.guess_frontend(job["path"])
-        # self.mod, self.params = frontend.load(job["path"], job["shape_dict"])
-        self.mod, self.params = frontend.load(job["path"])
+        self.mod, self.params = frontend.load(job["path"], shape_dict={job["input_name"]: job["input_shape"]})
+        # self.mod, self.params = frontend.load(job["path"])
 
     def compile(self, job: dict):
         config=parse_configs(None)
@@ -156,7 +156,9 @@ class Model():
                     hardware_params=hardware_params,
                     include_simple_tasks=job["include_simple_tasks"]
                 )
-                schedule_tasks(tasks, weights, tuning_options)
+                if not dry_run:
+                    schedule_tasks(tasks, weights, tuning_options)
+
             else:
                 tasks = autotvm.task.extract_from_program(
                     mod = transformed_mod,
@@ -164,12 +166,12 @@ class Model():
                     params=self.params
                 )
 
-            for i, task in enumerate(tasks):
-                prefix = "[Task %2d/%2d] " % (i + 1, len(tasks))
-                tuner_obj = pick_tuner(tuner = job["tuner"], task=task)
-                tuning_options
-                if not dry_run:
-                    if not job["enable_autoscheduler"]:
+                for i, task in enumerate(tasks):
+                    prefix = "[Task %2d/%2d] " % (i + 1, len(tasks))
+                    tuning_options
+                    if not dry_run:
+                        tuner_obj = pick_tuner(tuner = job["tuner"], task=task)
+
                         tuner_obj.tune(
                             n_trial=min(tuning_options["trials"], len(task.config_space)),
                             early_stopping=tuning_options["early_stopping"],
@@ -178,10 +180,15 @@ class Model():
                                     autotvm.callback.log_to_file(tuning_options["tuning_records"])]
                         )
 
-    def inferRandom(self, shape:tuple=(1, 3, 224, 224), profile: bool = False):
-        input = np.random.rand(1, 3, 224, 224)
-        self.module.set_input("data", input)
+    def inferRandom(self, job={}, profile: bool = False):
+        input = np.random.rand(*job["input_shape"])
+        self.module.set_input(job["input_name"], input)
+        s = None
+        out = []
         with Profiler(profile):
             s = time.time_ns()
             self.module.run()
-            return (time.time_ns() - s) / 1000000.0
+            s = (time.time_ns() - s) / 1000000.0
+        for o in range(0, self.module.get_num_outputs()):
+            out.append(self.module.get_output(o))
+        return s, out

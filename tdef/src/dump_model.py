@@ -22,16 +22,17 @@ from onnx import hub
 #     return {}
 
 
-def dumpONNX(model: str):
+def dumpONNX(dir: str):
     # hub.set_dir("dumps/onnx")
     # model = hub.load(model)
-    onnx_model = onnx.load_model("/home/s/cupti/learning/tuning_as_a_defence/tvm/scripts/dumps/onnx/vision/classification/resnet/model/4e8f8653e7a2222b3904cc3fe8e304cd8b339ce1d05fd24688162f86fb6df52c_resnet18-v1-7.onnx")
-    onnx_model.graph.input[0].type.tensor_type.shape.dim[0].dim_value = 1
-    onnx_model.graph.output[0].type.tensor_type.shape.dim[0].dim_value = 1
-    onnx.checker.check_model(onnx_model)
-    onnx.save(onnx_model, "/home/s/cupti/learning/tuning_as_a_defence/tvm/scripts/dumps/onnx/vision/classification/resnet/model/4e8f8653e7a2222b3904cc3fe8e304cd8b339ce1d05fd24688162f86fb6df52c_resnet18-v1-7.onnx")
-    print("frozen model saved")
-
+    for file in os.listdir(dir):
+        if ".onnx" in file:
+            model = onnx.load_model(f"{dir}/{file}")
+            model.graph.input[0].type.tensor_type.shape.dim[0].dim_value = 1
+            model.graph.output[0].type.tensor_type.shape.dim[0].dim_value = 1
+            onnx.checker.check_model(model)
+            onnx.save(model, f"{dir}/frozen/{file}")
+            print(f"frozen {file!a} model saved")
 
 # handlers = {
 #     Frameworks.PYTORCH: dumpPyTorch,

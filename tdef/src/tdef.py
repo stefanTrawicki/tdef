@@ -2,6 +2,7 @@ import os
 import json
 import numpy as np
 import hashlib
+from tqdm import trange
 
 # ============== TDEF imports ==============
 from .tvm_model import Model
@@ -30,14 +31,10 @@ class TDEF():
                 f.write(json.dumps(job, indent=4))
         return records_exist, records
 
-    def __init__(self, job:dict = {}, model_path="/home/s/cupti/learning/tuning_as_a_defence/tvm/scripts/dumps/pytorch/resnet18.pth.zip", dry_run=False):
-        file_name = model_path
-        # shape_dict = None
-        # with open(file_name + ".json") as f:
-        #     shape_dict = json.load(f)
+    def __init__(self, job:dict = {}, dry_run=False):
 
-        job["path"] = file_name
-        # job["shape_dict"] = shape_dict
+        job["input_shape"] = job.get("input_shape", (1, 3, 224, 224))
+        job["input_name"] = job.get("input_name", "data")
         job["enable_autoscheduler"] = job.get("enable_autoscheduler", False)
         job["parallel"] = job.get("parallel", 4)
         job["trials"] = job.get("trials", 10000)
@@ -46,7 +43,7 @@ class TDEF():
         job["number"] = job.get("number", 10)
         job["mixed_precision"] = job.get("mixed_precision", False)
         job["opt_level"] = job.get("opt_level", 3) 
-        job["gpus"] = job.get("gpus", [0])
+        job["gpus"] = job.get("gpus", [0, 1])
         job["target"] = job.get("target", "cuda -arch=sm_80")
         job["min_repeat_ms"] = job.get("min_repeat_ms", 1000)
         job["tuner"] = job.get("tuner", "xgb")
@@ -79,8 +76,11 @@ class TDEF():
         if not dry_run:
             model.compile(job)
             times = []
-            for i in range(0, 10000):
-                times.append(model.inferRandom(profile=True))
+            outs = []
+            for i in trange(1000):
+                t, o = model.inferRandom(job=job, profile=True)
+                times.append(t)
+                outs.append(o)
             avg = sum(times) / len(times)
             times.sort()
             min_t = times[0]
@@ -92,3 +92,16 @@ class TDEF():
                   f"med {med_t} ms \n" +
                   f"max {max_t} ms \n" +
                   f"variance {var}")
+            info = {
+                "timing": {
+                    "hash": job["hash"],
+                    "min": min_t,
+                    "max": max_t,
+                    "med": med_t,
+                    "var": var,
+                    "avg": avg,
+                    "times": times
+                }
+            }
+            with open(f"records/{job['hash']}_outputs.json", "w+") as out:
+                out.write(json.dumps(info, indent=4))
