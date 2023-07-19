@@ -37,7 +37,7 @@ class TDEF():
         job["input_name"] = job.get("input_name", "data")
         job["enable_autoscheduler"] = job.get("enable_autoscheduler", False)
         job["parallel"] = job.get("parallel", 4)
-        job["trials"] = job.get("trials", 10000)
+        job["trials"] = job.get("trials", None)
         job["timeout"] = job.get("timeout", 100)
         job["repeat"] = job.get("repeat", 1)
         job["number"] = job.get("number", 10)
@@ -77,7 +77,7 @@ class TDEF():
             model.compile(job)
             times = []
             outs = []
-            for i in trange(1000):
+            for i in trange(100):
                 t, o = model.inferRandom(job=job, profile=True)
                 times.append(t)
                 outs.append(o)
