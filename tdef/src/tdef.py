@@ -31,7 +31,10 @@ class TDEF():
                 f.write(json.dumps(job, indent=4))
         return records_exist, records
 
-    def __init__(self, job:dict = {}, dry_run=False):
+    def __init__(self, job:dict = {}, dry_run=False, sample=False):
+
+        records_override = job["override_records"]
+        del(job["override_records"])
 
         job["input_shape"] = job.get("input_shape", (1, 3, 224, 224))
         job["input_name"] = job.get("input_name", "data")
@@ -64,47 +67,60 @@ class TDEF():
         records_exist, records_path = self.records_and_data(job)
         job["records"] = records_path
 
-        print(json.dumps(job, indent=4))
-
         model = None
         if not records_exist:
             print(f"Records {records_path!a} not found, will tune")
+            if records_override is not None:
+                print('will not tune, records overridden!')
+                job["records"] = records_override
+                if sample:
+                    model = Model(job)
+                    model.compile(job)
+                    t, o = model.inferRandom(job=job, profile=True)
+                    print(f"{t}")
+                    exit
+
             model = Model(job)
             model.tune(job, dry_run=dry_run)
         else:
             print(f"Existing records {records_path!a} found, tuning not required")
+            if sample:
+                model = Model(job)
+                model.compile(job)
+                t, o = model.inferRandom(job=job, profile=True)
+                print(f"{t}")
 
-
-        # if not dry_run:
-        #     model = Model(job)
-        #     model.compile(job)
-        #     times = []
-        #     outs = []
-        #     for i in trange(100):
-        #         t, o = model.inferRandom(job=job, profile=True)
-        #         times.append(t)
-        #         outs.append(o)
-        #     avg = sum(times) / len(times)
-        #     times.sort()
-        #     min_t = times[0]
-        #     max_t = times[-1]
-        #     med_t = times[int(len(times)/2)]
-        #     var = np.var(times)
-        #     print(f"avg {avg} ms \n" +
-        #           f"min {min_t} ms \n" +
-        #           f"med {med_t} ms \n" +
-        #           f"max {max_t} ms \n" +
-        #           f"variance {var}")
-        #     info = {
-        #         "timing": {
-        #             "hash": job["hash"],
-        #             "min": min_t,
-        #             "max": max_t,
-        #             "med": med_t,
-        #             "var": var,
-        #             "avg": avg,
-        #             "times": times
-        #         }
-        #     }
-        #     with open(f"records/{job['hash']}_outputs.json", "w+") as out:
-        #         out.write(json.dumps(info, indent=4))
+        if not dry_run:
+            if not sample:
+                model = Model(job)
+                model.compile(job)
+                times = []
+                outs = []
+                for i in trange(100):
+                    t, o = model.inferRandom(job=job, profile=True)
+                    times.append(t)
+                    outs.append(o)
+                avg = sum(times) / len(times)
+                times.sort()
+                min_t = times[0]
+                max_t = times[-1]
+                med_t = times[int(len(times)/2)]
+                var = np.var(times)
+                print(f"avg {avg} ms \n" +
+                    f"min {min_t} ms \n" +
+                    f"med {med_t} ms \n" +
+                    f"max {max_t} ms \n" +
+                    f"variance {var}")
+                info = {
+                    "timing": {
+                        "hash": job["hash"],
+                        "min": min_t,
+                        "max": max_t,
+                        "med": med_t,
+                        "var": var,
+                        "avg": avg,
+                        "times": times
+                    }
+                }
+                with open(f"records/{job['hash']}_outputs.json", "w+") as out:
+                    out.write(json.dumps(info, indent=4))
