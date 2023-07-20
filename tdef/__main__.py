@@ -32,7 +32,7 @@ tuning_variants = {
         },
         "densenet121": {
             "path": "dumps/onnx/frozen/densenet-9.onnx",
-            "input_name": "data",
+            "input_name": "data_0",
             "input_shape": [1, 3, 224, 224]
         },
         "yolov4": {

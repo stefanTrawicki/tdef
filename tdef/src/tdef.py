@@ -66,42 +66,45 @@ class TDEF():
 
         print(json.dumps(job, indent=4))
 
-        model = Model(job)
+        model = None
         if not records_exist:
             print(f"Records {records_path!a} not found, will tune")
+            model = Model(job)
             model.tune(job, dry_run=dry_run)
         else:
             print(f"Existing records {records_path!a} found, tuning not required")
 
-        if not dry_run:
-            model.compile(job)
-            times = []
-            outs = []
-            for i in trange(100):
-                t, o = model.inferRandom(job=job, profile=True)
-                times.append(t)
-                outs.append(o)
-            avg = sum(times) / len(times)
-            times.sort()
-            min_t = times[0]
-            max_t = times[-1]
-            med_t = times[int(len(times)/2)]
-            var = np.var(times)
-            print(f"avg {avg} ms \n" +
-                  f"min {min_t} ms \n" +
-                  f"med {med_t} ms \n" +
-                  f"max {max_t} ms \n" +
-                  f"variance {var}")
-            info = {
-                "timing": {
-                    "hash": job["hash"],
-                    "min": min_t,
-                    "max": max_t,
-                    "med": med_t,
-                    "var": var,
-                    "avg": avg,
-                    "times": times
-                }
-            }
-            with open(f"records/{job['hash']}_outputs.json", "w+") as out:
-                out.write(json.dumps(info, indent=4))
+
+        # if not dry_run:
+        #     model = Model(job)
+        #     model.compile(job)
+        #     times = []
+        #     outs = []
+        #     for i in trange(100):
+        #         t, o = model.inferRandom(job=job, profile=True)
+        #         times.append(t)
+        #         outs.append(o)
+        #     avg = sum(times) / len(times)
+        #     times.sort()
+        #     min_t = times[0]
+        #     max_t = times[-1]
+        #     med_t = times[int(len(times)/2)]
+        #     var = np.var(times)
+        #     print(f"avg {avg} ms \n" +
+        #           f"min {min_t} ms \n" +
+        #           f"med {med_t} ms \n" +
+        #           f"max {max_t} ms \n" +
+        #           f"variance {var}")
+        #     info = {
+        #         "timing": {
+        #             "hash": job["hash"],
+        #             "min": min_t,
+        #             "max": max_t,
+        #             "med": med_t,
+        #             "var": var,
+        #             "avg": avg,
+        #             "times": times
+        #         }
+        #     }
+        #     with open(f"records/{job['hash']}_outputs.json", "w+") as out:
+        #         out.write(json.dumps(info, indent=4))

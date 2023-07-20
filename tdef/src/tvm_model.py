@@ -157,7 +157,10 @@ class Model():
                     include_simple_tasks=job["include_simple_tasks"]
                 )
                 if not dry_run:
-                    schedule_tasks(tasks, weights, tuning_options)
+                    try:
+                        schedule_tasks(tasks, weights, tuning_options)
+                    except ValueError as e:
+                        print(e)
 
             else:
                 tasks = autotvm.task.extract_from_program(
