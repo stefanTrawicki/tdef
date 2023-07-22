@@ -183,9 +183,7 @@ class Model():
                                     autotvm.callback.log_to_file(tuning_options["tuning_records"])]
                         )
 
-    def inferRandom(self, job={}, profile: bool = False):
-        input = np.random.rand(*job["input_shape"])
-        self.module.set_input(job["input_name"], input)
+    def inferRandom(self, profile: bool = False):
         s = None
         out = []
         with Profiler(profile):
