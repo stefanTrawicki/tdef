@@ -84,7 +84,10 @@ def create_hashed_dir(data_dict):
     records_filename = os.path.join(model_dir, f"records.json")
     already_existed = os.path.exists(records_filename) and os.path.isfile(records_filename)
     if already_existed:
-        already_existed = os.path.getsize(records_filename) > 10
+        file_size_ok = os.path.getsize(records_filename) > 10
+        already_existed = file_size_ok
+        if not file_size_ok:
+            print("Found records but file size was < 10 bytes, so probably failed previously. Will rerun")
     os.makedirs(model_dir, exist_ok=True)
     with open(metadata_filename, 'w') as file:
         file.write(json.dumps(data_dict, indent=2))

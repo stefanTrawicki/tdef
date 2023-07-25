@@ -28,7 +28,9 @@ def main():
     args = parser.parse_args()
 
     with open(args.json_file, 'r') as file:
-        for json_obj in json.load(file):
+        data = json.load(file)
+        for _, json_obj in enumerate(data):
             run_subprocess(json_obj)
+            print(f"Job Progress [{_}/{len(data)}]")
 
 main()
