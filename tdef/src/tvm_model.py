@@ -96,7 +96,7 @@ class Model():
                     self.device = tvm.device(str(job["target"]), job["gpus"][0])
                     self.module = executor.GraphModule(self.lib["default"](self.device))
 
-    def tune(self, job: dict, dry_run:bool=False) -> str:
+    def tune(self, job: dict) -> str:
         with tvm.transform.PassContext(opt_level=int(job["opt_level"])):
 
             hardware_params = None
@@ -123,6 +123,9 @@ class Model():
                 min_repeat_ms=job["min_repeat_ms"]
             )
 
+            transform_arguments = parse_graph_transform_args(locals())
+            transformed_mod:tvm.IRModule = apply_graph_transforms(self.mod, transform_arguments)
+
             tuning_options = {}
             if job["enable_autoscheduler"]:
                 tuning_options = auto_scheduler.TuningOptions(
@@ -131,6 +134,19 @@ class Model():
                     runner=runner,
                     early_stopping=job["early_stopping"]
                 )
+
+                tasks, weights = autoscheduler_get_tuning_tasks(
+                    mod=transformed_mod,
+                    params=self.params,
+                    target=job["target"],
+                    transform_args=transform_arguments,
+                    hardware_params=hardware_params,
+                    include_simple_tasks=job["include_simple_tasks"]
+                )
+                try:
+                    schedule_tasks(tasks, weights, tuning_options)
+                except ValueError as e:
+                    print(e)
             else:
                 tuning_options = {
                     "tuner": job["tuner"],
@@ -143,26 +159,6 @@ class Model():
                     "tuning_records": job["records"]
                 }
 
-            transform_arguments = parse_graph_transform_args(locals())
-            transformed_mod:tvm.IRModule = apply_graph_transforms(self.mod, transform_arguments)
-
-            tasks = None
-            if job["enable_autoscheduler"]:
-                tasks, weights = autoscheduler_get_tuning_tasks(
-                    mod=transformed_mod,
-                    params=self.params,
-                    target=job["target"],
-                    transform_args=transform_arguments,
-                    hardware_params=hardware_params,
-                    include_simple_tasks=job["include_simple_tasks"]
-                )
-                if not dry_run:
-                    try:
-                        schedule_tasks(tasks, weights, tuning_options)
-                    except ValueError as e:
-                        print(e)
-
-            else:
                 tasks = autotvm.task.extract_from_program(
                     mod = transformed_mod,
                     target=job["target"],
@@ -171,17 +167,14 @@ class Model():
 
                 for i, task in enumerate(tasks):
                     prefix = "[Task %2d/%2d] " % (i + 1, len(tasks))
-                    tuning_options
-                    if not dry_run:
-                        tuner_obj = pick_tuner(tuner = job["tuner"], task=task)
-
-                        tuner_obj.tune(
-                            n_trial=min(tuning_options["trials"], len(task.config_space)),
-                            early_stopping=tuning_options["early_stopping"],
-                            measure_option=tuning_options["measure_option"],
-                            callbacks=[autotvm.callback.progress_bar(tuning_options["trials"], prefix=prefix),
-                                    autotvm.callback.log_to_file(tuning_options["tuning_records"])]
-                        )
+                    tuner_obj = pick_tuner(tuner = job["tuner"], task=task)
+                    tuner_obj.tune(
+                        n_trial=min(tuning_options["trials"], len(task.config_space)),
+                        early_stopping=tuning_options["early_stopping"],
+                        measure_option=tuning_options["measure_option"],
+                        callbacks=[autotvm.callback.progress_bar(tuning_options["trials"], prefix=prefix),
+                                autotvm.callback.log_to_file(job["records"])]
+                    )
 
     def inferRandom(self, profile: bool = False):
         s = None
