@@ -77,7 +77,9 @@ def assign_defaults(data, schema):
     return merged_data
 
 def create_hashed_dir(data_dict):
-    json_string = json.dumps(data_dict, sort_keys=True)
+    hashable_dict = data_dict.copy()
+    json_string = json.dumps(hashable_dict, sort_keys=True)
+    del(hashable_dict["gpus"])
     hash_value = hashlib.sha256(json_string.encode()).hexdigest()
     model_dir = f"records/{data_dict.get('model', 'default_model')}/{hash_value}/"
     metadata_filename = os.path.join(model_dir, f"metadata.json")
@@ -91,32 +93,31 @@ def create_hashed_dir(data_dict):
     os.makedirs(model_dir, exist_ok=True)
     with open(metadata_filename, 'w') as file:
         file.write(json.dumps(data_dict, indent=2))
-    with open(records_filename, "w+") as file:
-        pass
+    open(records_filename, "a").close()
     return model_dir, already_existed
 
 def run_model_x_times(model, x, profile=False):
-        times = []
-        for i in trange(x):
-            t, o = model.inferRandom(profile=profile)
-            times.append(t)
-        avg = sum(times) / len(times)
-        times.sort()
-        min_t = times[0]
-        max_t = times[-1]
-        med_t = times[int(len(times)/2)]
-        var = np.var(times)
-        info = {
-            "timing": {
-                "min": min_t,
-                "max": max_t,
-                "med": med_t,
-                "var": var,
-                "avg": avg,
-                "times": times
-            }
+    times = []
+    for i in trange(x):
+        t, o = model.inferRandom(profile=profile)
+        times.append(t)
+    avg = sum(times) / len(times)
+    times.sort()
+    min_t = times[0]
+    max_t = times[-1]
+    med_t = times[int(len(times)/2)]
+    var = np.var(times)
+    info = {
+        "timing": {
+            "min": min_t,
+            "max": max_t,
+            "med": med_t,
+            "var": var,
+            "avg": avg,
+            "times": times
         }
-        return info
+    }
+    return info
 
 class TDEF():
     def __init__(self, job_json, force_no_tuning=False):
@@ -134,6 +135,11 @@ class TDEF():
         records = os.path.join(dir, "records.json")
         job["records"] = records
 
+        timings = os.path.join(dir, "timings.json")
+        if os.path.exists(timings) and not force_no_tuning:
+            print("Already ran combination and gathered timings, skipping!")
+            return
+
         model = None
         if not force_no_tuning:
             if not test_ran_previously:
@@ -144,7 +150,7 @@ class TDEF():
                 print(f"Combination ({dir!a}) ran previously, no tuning required")
 
         if force_no_tuning:
-            print("Will not use any tuning records, baseline TVM compiled run (will still apply selected graph level opt)")
+            print("Will not attempt to tune the model, only execute!")
 
         model = Model(job)
         model.compile(job)
@@ -158,13 +164,5 @@ class TDEF():
         run_model_x_times(model, 1, profile=True)
 
         if not force_no_tuning:
-            with open(os.path.join(dir, "timings.json"), "w+") as f:
+            with open(timings, "w+") as f:
                 f.write(json.dumps(timing, indent=2))
-        else:
-            with open(os.path.join(dir, "timings_notune.json"), "w+") as f:
-                f.write(json.dumps(timing, indent=2))
-
-        self.dir = dir
-
-    def __str__(self):
-        return self.dir

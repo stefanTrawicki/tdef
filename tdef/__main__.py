@@ -36,4 +36,4 @@ if __name__ == "__main__":
         print(e)
         exit
 
-    print(f"output_dir: {main(data, args.notune)}")
+    main(data, args.notune)
