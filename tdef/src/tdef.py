@@ -99,7 +99,7 @@ def create_hashed_dir(data_dict):
     open(records_filename, "a").close()
     return model_dir, already_existed
 
-def run_model_x_times(model, x, profile=False):
+def run_model_x_times(model, job, x, profile=False):
     times = []
     for i in trange(x):
         input_data = np.random.rand(*job["input_shape"])
@@ -134,23 +134,18 @@ class TDEF():
             print(e)
             return
         
-        pretty_print_schema(job)
-
         x = 10
         if collecting_baselines:
-            print(f"Collecting baselines; standard ONNX model running in ONNX runtime ({onnxruntime.get_device()})")
-            session = onnxruntime.InferenceSession(job["path"], providers=["CUDAExecutionProvider"])
-            input_name = session.get_inputs()[0].name
-            print(f"Running {x} baseline shakedown inferences...")
-            for x in range(0, x):
-                input_data = np.random.rand(*job["input_shape"]).astype("float32")
-                session.run(None, {input_name: input_data})
+            print("Collecting baselines, nothing else...")
+            job["records"] = None
+            model = Model(job)
+            model.compile(job)
+            print("Running baseline measured inference...")
+            run_model_x_times(model, job, 1, profile=True)
+            print("Finished collecting baselines!")
+            return
 
-            print(f"Running and profiling baseline inference...")
-            input_data = np.random.rand(*job["input_shape"]).astype("float32")
-            with Profiler(True):
-                session.run(None, {input_name: input_data})
-
+        pretty_print_schema(job)
         dir, test_ran_previously = create_hashed_dir(job)
         records = os.path.join(dir, "records.json")
         job["records"] = records
@@ -177,9 +172,9 @@ class TDEF():
 
         # see if this has a bearing on perf, the earliest runs can be a bit slow
         print(f"Running {x} shakedown inferences...")
-        timing = run_model_x_times(model, x, profile=False)
+        timing = run_model_x_times(model, job, x, profile=False)
         print("Running measured inference...")
-        run_model_x_times(model, 1, profile=True)
+        run_model_x_times(model, job, 1, profile=True)
 
         if not force_no_tuning:
             with open(timings, "w+") as f:
