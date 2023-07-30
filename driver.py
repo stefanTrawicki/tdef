@@ -19,10 +19,37 @@ def run_tests(notune):
         for exp in get_subs(s):
             with open(os.path.join(exp, "metadata.json"), "r") as f:
                 info = json.load(f)
+                baseline_logs_path = os.path.join(s, "ncu_logs.log")
+                if not os.path.exists(baseline_logs_path):
+                    print("Baseline not yet found for this model, running now!")
+                    checked.append(baseline_logs_path)
+                    info = {k: info[k] for k in keys_to_keep}
+                    json_str = json.dumps(info).replace("'", '"')
+                    wrapped_json_str = f"\'{json_str}\'"
+                    baseline_command = "sudo CUDA_VISIBLE_DEVICES=1 PATH=/usr/local/cuda-11.7/bin:$PATH TVM_PATH={} PYTHONPATH={} LD_LIBRARY_PATH=/home/s/cupti/learning/samples/activity_trace_async/venv/lib/python3.8/site-packages/nvidia/cudnn/lib:$LD_LIBRARY_PATH /usr/local/cuda-11.7/bin/ncu --csv --log-file {} --metric lts__t_sectors_op_write.sum,lts__t_sectors_op_read.sum --target-processes all --profile-from-start no {}/venv/bin/python -m tdef {} --json_string {}".format(
+                        TVM_LOC,
+                        PYTHON_PATH,
+                        baseline_logs_path,
+                        BASE,
+                        "--baselines",
+                        wrapped_json_str
+                    )
+                    process = subprocess.Popen([baseline_command], stdout=subprocess.PIPE, shell=True)
+                    for c in iter(lambda: process.stdout.read(1), b""):
+                        sys.stdout.buffer.write(c)
+
+                    mem_output_name = os.path.join(s, "memory_logs.log")
+                    time_output_name = os.path.join(s, "time_logs.log")
+                    try:
+                        convert(baseline_logs_path, mem_output_name, time_output_name)
+                    except Exception as e:
+                        print(e)
+                    print("Baseline collected for this model!")
+
                 timings_path = os.path.join(exp, "timings.json")
                 if not os.path.exists(timings_path):
                     print("Timing info not present, probably hasn't been tuned yet, skipping!")
-                    continue
+                    continue              
 
                 logs_path = os.path.join(exp, "ncu_logs.log")
                 if os.path.exists(logs_path):
@@ -42,7 +69,6 @@ def run_tests(notune):
                     "--notune" if notune else "",
                     wrapped_json_str
                 )
-                print(ncu_command)
                 process = subprocess.Popen([ncu_command], stdout=subprocess.PIPE, shell=True)
                 for c in iter(lambda: process.stdout.read(1), b""):
                     sys.stdout.buffer.write(c)

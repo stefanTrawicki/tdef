@@ -4,6 +4,9 @@ import numpy as np
 import hashlib
 from tqdm import trange
 import jsonschema
+import onnx
+import onnxruntime
+from .utilities import Profiler
 
 # ============== TDEF imports ==============
 from .tvm_model import Model
@@ -99,6 +102,8 @@ def create_hashed_dir(data_dict):
 def run_model_x_times(model, x, profile=False):
     times = []
     for i in trange(x):
+        input_data = np.random.rand(*job["input_shape"])
+        model.module.set_input(job["input_name"], input_data)
         t, o = model.inferRandom(profile=profile)
         times.append(t)
     avg = sum(times) / len(times)
@@ -120,17 +125,32 @@ def run_model_x_times(model, x, profile=False):
     return info
 
 class TDEF():
-    def __init__(self, job_json, force_no_tuning=False):
-
+    def __init__(self, job_json, force_no_tuning=False, collecting_baselines=False):
         try:
             jsonschema.validate(instance=job_json, schema=job_schema)
             job = assign_defaults(job_json, job_schema)
         except jsonschema.exceptions.ValidationError as e:
             print("Job was invalid:")
-            print(e.messages)
+            print(e)
             return
         
         pretty_print_schema(job)
+
+        x = 10
+        if collecting_baselines:
+            print(f"Collecting baselines; standard ONNX model running in ONNX runtime ({onnxruntime.get_device()})")
+            session = onnxruntime.InferenceSession(job["path"], providers=["CUDAExecutionProvider"])
+            input_name = session.get_inputs()[0].name
+            print(f"Running {x} baseline shakedown inferences...")
+            for x in range(0, x):
+                input_data = np.random.rand(*job["input_shape"]).astype("float32")
+                session.run(None, {input_name: input_data})
+
+            print(f"Running and profiling baseline inference...")
+            input_data = np.random.rand(*job["input_shape"]).astype("float32")
+            with Profiler(True):
+                session.run(None, {input_name: input_data})
+
         dir, test_ran_previously = create_hashed_dir(job)
         records = os.path.join(dir, "records.json")
         job["records"] = records
@@ -154,10 +174,8 @@ class TDEF():
 
         model = Model(job)
         model.compile(job)
-        model.module.set_input(job["input_name"], np.random.rand(*job["input_shape"]))
 
         # see if this has a bearing on perf, the earliest runs can be a bit slow
-        x = 10
         print(f"Running {x} shakedown inferences...")
         timing = run_model_x_times(model, x, profile=False)
         print("Running measured inference...")
